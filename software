@@ -1,0 +1,70 @@
+#include <HID-Project.h>
+
+// Ustawienia pinów i przycisków
+int przyciski[] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
+int potencjometry[] = {A0, A1};
+
+// Zmienne do przechowywania stanu
+int ostatniStan[12];
+long ostatniCzas[12];
+int ostatniPot[2];
+
+int czuloscPot = 6; // Żeby oś nie drgała (martwa strefa)
+int debounceTime = 25; 
+
+void setup() {
+  // Konfiguracja przycisków
+  for (int i = 0; i < 12; i++) {
+    pinMode(przyciski[i], INPUT_PULLUP);
+    ostatniStan[i] = digitalRead(przyciski[i]);
+    ostatniCzas[i] = 0;
+  }
+
+  // Odczyt startowy potencjometrów
+  ostatniPot[0] = analogRead(potencjometry[0]);
+  ostatniPot[1] = analogRead(potencjometry[1]);
+
+  Gamepad.begin();
+}
+
+void loop() {
+  unsigned long teraz = millis();
+
+  // Sprawdzanie wszystkich 12 przycisków
+  for (int i = 0; i < 12; i++) {
+    int odczyt = digitalRead(przyciski[i]);
+
+    // Prosty debounce - jeśli stan się zmienił
+    if (odczyt != ostatniStan[i]) {
+      if ((teraz - ostatniCzas[i]) > debounceTime) {
+        ostatniStan[i] = odczyt;
+        ostatniCzas[i] = teraz;
+
+        if (odczyt == LOW) {
+          Gamepad.press(i + 1);
+        } else {
+          Gamepad.release(i + 1);
+        }
+      }
+    }
+  }
+
+  // Obsługa osi X
+  int valX = analogRead(potencjometry[0]);
+  if (abs(valX - ostatniPot[0]) > czuloscPot) {
+    ostatniPot[0] = valX;
+    // Mapowanie na zakres Gamepada (-32767 do 32767)
+    Gamepad.xAxis(map(valX, 0, 1023, -32767, 32767));
+  }
+
+  // Obsługa osi Y
+  int valY = analogRead(potencjometry[1]);
+  if (abs(valY - ostatniPot[1]) > czuloscPot) {
+    ostatniPot[1] = valY;
+    Gamepad.yAxis(map(valY, 0, 1023, -32767, 32767));
+  }
+
+  // Wyślij dane do komputera
+  Gamepad.write();
+  delay(10); // Małe opóźnienie dla stabilności
+}
